@@ -114,9 +114,7 @@ def bidirectional_sync(base_dir: Path) -> dict:
 
         # Get list of local stores
         local_stores = {
-            f"{p.parent.name}/{p.name}"
-            for p in base_dir.glob("*/*_faiss")
-            if p.is_dir()
+            f"{p.parent.name}/{p.name}" for p in base_dir.glob("*/*_faiss") if p.is_dir()
         }
 
         # Download stores in HF but not local

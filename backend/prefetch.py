@@ -35,10 +35,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 DEFAULT_TICKERS = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA",
-    "META", "NVDA", "JPM", "WMT", "NFLX",
-    "AMD", "ORCL", "INTC", "BAC", "V",
-    "DIS", "UBER", "HOOD", "CRWD", "PLTR",
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "TSLA",
+    "META",
+    "NVDA",
+    "JPM",
+    "WMT",
+    "NFLX",
+    "AMD",
+    "ORCL",
+    "INTC",
+    "BAC",
+    "V",
+    "DIS",
+    "UBER",
+    "HOOD",
+    "CRWD",
+    "PLTR",
 ]
 
 
