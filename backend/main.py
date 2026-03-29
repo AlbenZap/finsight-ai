@@ -1098,36 +1098,30 @@ async def job_status(job_id: str):
 
 
 @app.delete("/cache/{ticker}")
-async def clear_cache(ticker: str):
-    """Remove all variants for a ticker from the analysis cache."""
+async def clear_cache(
+    ticker: str,
+    form_type: str | None = None,
+    mode: str | None = None,
+):
+    """Remove cache entries for a ticker.
+    - DELETE /cache/TSLA                        → clears all TSLA variants
+    - DELETE /cache/TSLA?form_type=10-K&mode=analyst → clears one specific variant
+    """
     ticker = ticker.upper()
-    removed = [k for k in list(analysis_cache.keys()) if k == ticker or k.startswith(f"{ticker}:")]
-    for k in removed:
-        del analysis_cache[k]
-    return {"cleared": removed}
-
-
-@app.delete("/cache/{ticker}/{form_type}/{mode}")
-async def clear_cache_variant(ticker: str, form_type: str, mode: str):
-    """Remove a specific ticker/form_type/mode variant from the analysis cache."""
-    ticker = ticker.upper()
-    form_type = form_type.upper().replace("10K", "10-K").replace("10Q", "10-Q")
-    mode = mode.lower()
-    key = f"{ticker}:{form_type}:{mode}"
+    if form_type and mode:
+        form_type = form_type.upper().replace("10K", "10-K").replace("10Q", "10-Q")
+        mode = mode.lower()
+        keys = [f"{ticker}:{form_type}:{mode}", ticker]
+    else:
+        keys = [k for k in list(analysis_cache.keys()) if k == ticker or k.startswith(f"{ticker}:")]
     removed = []
-    if key in analysis_cache:
-        del analysis_cache[key]
-        removed.append(key)
-    # Also clear bare-ticker alias if it pointed to this variant
-    if ticker in analysis_cache:
-        del analysis_cache[ticker]
-        removed.append(ticker)
+    for k in keys:
+        if k in analysis_cache:
+            del analysis_cache[k]
+            removed.append(k)
     if not removed:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No cache entry found for {ticker} · {form_type} · {mode.capitalize()}",
-        )
-    return {"cleared": f"{ticker} · {form_type} · {mode.capitalize()}"}
+        raise HTTPException(status_code=404, detail=f"No cache entry found for {ticker}")
+    return {"cleared": removed}
 
 
 @app.get("/ask/")

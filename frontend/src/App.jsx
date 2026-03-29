@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
+import { Analytics } from '@vercel/analytics/react';
 
 const API = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
@@ -789,6 +790,7 @@ export default function App() {
   }, [comparisonData]);
 
   return (
+    <>
     <div className="min-h-screen bg-gray-950 text-gray-100 font-mono flex flex-col">
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <header className="border-b border-gray-800/80 bg-gray-950/90 backdrop-blur-sm px-6 py-3 flex items-center justify-between sticky top-0 z-50">
@@ -1440,5 +1442,7 @@ export default function App() {
         </p>
       </footer>
     </div>
+    <Analytics />
+    </>
   );
 }
