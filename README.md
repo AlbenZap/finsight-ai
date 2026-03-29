@@ -39,7 +39,7 @@ FastAPI Backend (HuggingFace Spaces)
 
 ## System Architecture
 
-![Architecture](https://raw.githubusercontent.com/AlbenZap/finsight-ai/main/docs/finsight-arch.png)
+![Architecture](https://media.githubusercontent.com/media/AlbenZap/finsight-ai/main/docs/finsight-arch.png)
 
 ## Tech Stack
 
