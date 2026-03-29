@@ -86,6 +86,78 @@ def upload_store(store_path: Path, ticker: str, form_type: str) -> bool:
         return False
 
 
+def bidirectional_sync(base_dir: Path) -> dict:
+    """
+    Two-way sync between local faiss_stores/ and HF Dataset repo:
+    - Downloads stores present in HF but missing locally
+    - Uploads stores present locally but missing in HF
+
+    Returns {"downloaded": int, "uploaded": int}
+    """
+    token, repo_id = _get_config()
+    if not token or not repo_id:
+        logger.info("HF_TOKEN or HF_DATASET_REPO not set - skipping sync")
+        return {"downloaded": 0, "uploaded": 0}
+
+    try:
+        from huggingface_hub import HfApi, snapshot_download
+
+        api = HfApi(token=token)
+
+        # Get list of stores in HF repo
+        repo_files = api.list_repo_files(repo_id=repo_id, repo_type="dataset", token=token)
+        repo_stores = {
+            f.split("/")[0] + "/" + f.split("/")[1]
+            for f in repo_files
+            if f.count("/") >= 2 and f.split("/")[1].endswith("_faiss")
+        }
+
+        # Get list of local stores
+        local_stores = {
+            f"{p.parent.name}/{p.name}"
+            for p in base_dir.glob("*/*_faiss")
+            if p.is_dir()
+        }
+
+        # Download stores in HF but not local
+        stores_to_download = repo_stores - local_stores
+        downloaded = 0
+        if stores_to_download:
+            # Pre-create cache dirs to avoid permission errors on restricted filesystems
+            for store_key in stores_to_download:
+                (base_dir.resolve() / ".cache" / "huggingface" / "download" / store_key).mkdir(
+                    parents=True, exist_ok=True
+                )
+            snapshot_download(
+                repo_id=repo_id,
+                repo_type="dataset",
+                local_dir=str(base_dir.resolve()),
+                token=token,
+                ignore_patterns=["*.gitattributes", ".gitattributes", "README.md"],
+            )
+            downloaded = len(stores_to_download)
+            logger.info(f"Downloaded {downloaded} new store(s) from HF")
+
+        # Upload stores local but not in HF
+        stores_to_upload = local_stores - repo_stores
+        uploaded = 0
+        for store_key in stores_to_upload:
+            ticker, store_name = store_key.split("/")
+            # Parse form_type from store name e.g. AAPL_10K_faiss -> 10-K
+            parts = store_name.replace("_faiss", "").split("_")
+            form_type = parts[-1].replace("10K", "10-K").replace("10Q", "10-Q")
+            store_path = base_dir / ticker / store_name
+            if upload_store(store_path, ticker, form_type):
+                uploaded += 1
+
+        logger.info(f"Bidirectional sync complete: {downloaded} downloaded, {uploaded} uploaded")
+        return {"downloaded": downloaded, "uploaded": uploaded}
+
+    except Exception as e:
+        logger.warning(f"Bidirectional sync failed: {e}")
+        return {"downloaded": 0, "uploaded": 0}
+
+
 def restore_all_stores(base_dir: Path) -> int:
     """
     Download all FAISS stores from HF Dataset repo to local disk on startup.
@@ -104,7 +176,7 @@ def restore_all_stores(base_dir: Path) -> int:
         snapshot_download(
             repo_id=repo_id,
             repo_type="dataset",
-            local_dir=str(base_dir),
+            local_dir=str(base_dir.resolve()),
             token=token,
             ignore_patterns=["*.gitattributes", ".gitattributes", "README.md"],
         )

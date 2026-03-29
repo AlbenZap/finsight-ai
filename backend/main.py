@@ -39,7 +39,13 @@ from faiss_manager import faiss_manager
 from langchain_pipeline import SYSTEM_PROMPT, get_llm, get_provider_name
 from plots import get_company_filings_data, plot_balance_sheet, plot_cash_flow, plot_revenue
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -1899,10 +1905,10 @@ def get_vector_stores():
 
 @app.post("/sync_stores/")
 async def sync_stores():
-    """Pull any new FAISS indexes from HF Dataset repo without restarting the Space."""
-    count = await asyncio.to_thread(hf_store.restore_all_stores, faiss_manager.base_dir)
+    """Two-way sync: download new stores from HF, upload local stores missing from HF."""
+    result = await asyncio.to_thread(hf_store.bidirectional_sync, faiss_manager.base_dir)
     stores = faiss_manager.list_stores()
-    return {"synced": count, "available_stores": stores}
+    return {**result, "available_stores": stores}
 
 
 @app.get("/cache/")

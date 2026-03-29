@@ -24,6 +24,7 @@ import sys
 
 from edgar import Company, set_identity
 
+import hf_store
 from faiss_manager import faiss_manager
 
 logging.basicConfig(
@@ -34,16 +35,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 DEFAULT_TICKERS = [
-    "AAPL",
-    "MSFT",
-    "GOOGL",
-    "AMZN",
-    "TSLA",
-    "META",
-    "NVDA",
-    "JPM",
-    "WMT",
-    "NFLX",
+    "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA",
+    "META", "NVDA", "JPM", "WMT", "NFLX",
+    "AMD", "ORCL", "INTC", "BAC", "V",
+    "DIS", "UBER", "HOOD", "CRWD", "PLTR",
 ]
 
 
@@ -57,7 +52,7 @@ async def prefetch_ticker(ticker: str, form_type: str = "10-K") -> None:
 
     try:
         logger.info(f"[{ticker}] Fetching {form_type} filing from SEC EDGAR...")
-        set_identity(os.environ.get("SEC_IDENTITY", "finsight@example.com"))
+        set_identity(os.getenv("SEC_IDENTITY", "FinSight AI finsight@example.com"))
         company = Company(ticker)
         filings = company.get_filings(form=form_type)
         if not filings:
@@ -81,6 +76,9 @@ async def prefetch_ticker(ticker: str, form_type: str = "10-K") -> None:
 
         if vector_store:
             logger.info(f"[{ticker}] Done - {vector_store.index.ntotal} chunks indexed")
+            if hf_store.is_configured():
+                store_path = faiss_manager._get_store_path(ticker, form_type)
+                await asyncio.to_thread(hf_store.upload_store, store_path, ticker, form_type)
         else:
             logger.error(f"[{ticker}] Vector store creation returned None")
 
@@ -90,20 +88,22 @@ async def prefetch_ticker(ticker: str, form_type: str = "10-K") -> None:
 
 async def main() -> None:
     args = sys.argv[1:]
-    form_type = "10-K"
+    form_types = ["10-K", "10-Q"]
     if "--form" in args:
         idx = args.index("--form")
-        form_type = args[idx + 1]
+        form_types = [args[idx + 1]]
         args = args[:idx] + args[idx + 2 :]
 
     tickers = [t.upper() for t in args] if args else DEFAULT_TICKERS
-    logger.info(f"Prefetching {len(tickers)} ticker(s) [{form_type}]: {', '.join(tickers)}")
 
-    for ticker in tickers:
-        await prefetch_ticker(ticker, form_type)
-        await asyncio.sleep(1)  # polite pause between SEC EDGAR requests
+    for form_type in form_types:
+        logger.info(f"Prefetching {len(tickers)} ticker(s) [{form_type}]: {', '.join(tickers)}")
+        for ticker in tickers:
+            await prefetch_ticker(ticker, form_type)
+            await asyncio.sleep(1)  # polite pause between SEC EDGAR requests
+        logger.info(f"Prefetch complete for {form_type}")
 
-    logger.info("Prefetch complete")
+    logger.info("All done")
 
 
 if __name__ == "__main__":
