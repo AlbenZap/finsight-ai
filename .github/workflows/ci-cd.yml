@@ -19,7 +19,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install Ruff
-        run: pip install ruff
+        run: pip install ruff==0.8.3
 
       - name: Ruff check
         run: ruff check backend/
