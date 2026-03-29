@@ -7,8 +7,9 @@ validation helpers, and FAISS manager utilities.
 Run: pytest tests/ -v --cov=. --cov-report=term-missing
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
 
