@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Shimmer animation for progress bar ─────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.progress-shimmer {
+  background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 40%, #93c5fd 50%, #60a5fa 60%, #3b82f6 100%);
+  background-size: 200% auto;
+  animation: shimmer 1.8s linear infinite;
+}
+
+/* ── Prose rendering improvements ───────────────────────────────────────── */
+
+/* Headings: clear hierarchy with spacing */
+.prose h3 {
+  color: #e2e8f0 !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  margin-top: 1.1em !important;
+  margin-bottom: 0.4em !important;
+  border-bottom: 1px solid #374151;
+  padding-bottom: 0.2em;
+}
+
+.prose h4 {
+  color: #cbd5e1 !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  margin-top: 0.9em !important;
+  margin-bottom: 0.3em !important;
+}
+
+/* Paragraphs: justified for dense financial text */
+.prose p {
+  text-align: justify !important;
+  hyphens: auto !important;
+  margin-bottom: 0.6em !important;
+  line-height: 1.7 !important;
+  color: #d1d5db !important;
+}
+
+/* Lists: tighter spacing, clear bullets */
+.prose ul,
+.prose ol {
+  margin-top: 0.4em !important;
+  margin-bottom: 0.6em !important;
+  padding-left: 1.4em !important;
+}
+
+.prose li {
+  text-align: left !important;
+  margin-bottom: 0.3em !important;
+  line-height: 1.6 !important;
+  color: #d1d5db !important;
+}
+
+/* Bold: highlight metrics clearly */
+.prose strong {
+  color: #f1f5f9 !important;
+  font-weight: 700 !important;
+}
+
+/* Italic: section citations */
+.prose em {
+  color: #93c5fd !important;
+  font-style: italic !important;
+}
+
+/* Code spans (inline) */
+.prose code {
+  background: #1e293b !important;
+  color: #7dd3fc !important;
+  padding: 0.1em 0.35em !important;
+  border-radius: 3px !important;
+  font-size: 0.85em !important;
+}
