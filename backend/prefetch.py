@@ -34,8 +34,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 DEFAULT_TICKERS = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA",
-    "META", "NVDA", "JPM", "WMT", "NFLX",
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "TSLA",
+    "META",
+    "NVDA",
+    "JPM",
+    "WMT",
+    "NFLX",
 ]
 
 
@@ -86,7 +94,7 @@ async def main() -> None:
     if "--form" in args:
         idx = args.index("--form")
         form_type = args[idx + 1]
-        args = args[:idx] + args[idx + 2:]
+        args = args[:idx] + args[idx + 2 :]
 
     tickers = [t.upper() for t in args] if args else DEFAULT_TICKERS
     logger.info(f"Prefetching {len(tickers)} ticker(s) [{form_type}]: {', '.join(tickers)}")

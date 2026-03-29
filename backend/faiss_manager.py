@@ -158,7 +158,14 @@ class FAISSVectorManager:
     def _compute_content_hash(self, content: str) -> str:
         return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
-    def _save_metadata(self, ticker: str, accession_number: str, content_hash: str, chunk_count: int, form_type: str = "10-K") -> None:
+    def _save_metadata(
+        self,
+        ticker: str,
+        accession_number: str,
+        content_hash: str,
+        chunk_count: int,
+        form_type: str = "10-K",
+    ) -> None:
         metadata = {
             "ticker": ticker.upper(),
             "form_type": form_type,
@@ -230,7 +237,9 @@ class FAISSVectorManager:
             logger.error(f"Failed to load store for {ticker} ({form_type}): {e}")
             return None
 
-    def create_vector_store(self, content: str, ticker: str, accession_number: str, form_type: str = "10-K") -> FAISS | None:
+    def create_vector_store(
+        self, content: str, ticker: str, accession_number: str, form_type: str = "10-K"
+    ) -> FAISS | None:
         """
         Create or load FAISS vector store from SEC filing content.
 
@@ -253,7 +262,9 @@ class FAISSVectorManager:
             vs = self.load_store(ticker, form_type)
             if vs:
                 return vs
-            logger.warning(f"Cache check passed but load failed for {ticker} ({form_type}) - rebuilding")
+            logger.warning(
+                f"Cache check passed but load failed for {ticker} ({form_type}) - rebuilding"
+            )
 
         logger.info(f"Processing {len(content):,} chars for {ticker}")
 
@@ -269,16 +280,18 @@ class FAISSVectorManager:
                 "form_type": form_type,
                 "type": f"sec_{form_type.lower().replace('-', '')}",
                 "accession_number": accession_number,
-                "filing_year": accession_number.split("-")[1] if "-" in accession_number else "unknown",
+                "filing_year": accession_number.split("-")[1]
+                if "-" in accession_number
+                else "unknown",
             },
         )
 
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1500,      # larger chunks capture more table context
+            chunk_size=1500,  # larger chunks capture more table context
             chunk_overlap=150,
             length_function=len,
             separators=[
-                "<<<TABLE>>>",    # table blocks as primary separator (atomic units)
+                "<<<TABLE>>>",  # table blocks as primary separator (atomic units)
                 "\n\n",
                 "\n",
                 " ",
@@ -314,7 +327,9 @@ class FAISSVectorManager:
             logger.error(f"Failed to create vector store for {ticker} ({form_type}): {e}")
             return None
 
-    def get_mmr_retriever(self, ticker: str, form_type: str = "10-K", k: int = 12, lambda_mult: float = 0.5):
+    def get_mmr_retriever(
+        self, ticker: str, form_type: str = "10-K", k: int = 12, lambda_mult: float = 0.5
+    ):
         """
         Load FAISS store for ticker+form_type and return an MMR retriever with metadata filtering.
 
