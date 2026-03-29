@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 # Pydantic models
 # ---------------------------------------------------------------------------
 
+
 class JobStatusResponse(BaseModel):
     job_id: str
     status: Literal["processing", "complete", "error"]
@@ -84,6 +85,7 @@ SESSION_CAP = 50
 # ---------------------------------------------------------------------------
 # yfinance cash flow supplement for Financial Performance section
 # ---------------------------------------------------------------------------
+
 
 def get_yfinance_dividends(ticker: str) -> str:
     """
@@ -128,12 +130,16 @@ def get_yfinance_rd(ticker: str) -> str:
         rd_row = next((inc.loc[k] for k in rd_keys if k in inc.index), None)
         if rd_row is None:
             return ""
-        lines = ["R&D Expense (from income statement) — use these figures for Research and Development expense:"]
+        lines = [
+            "R&D Expense (from income statement) — use these figures for Research and Development expense:"
+        ]
         for col in list(inc.columns)[:3]:
             val = rd_row[col]
             if val != val:  # NaN
                 continue
-            lines.append(f"  - **{col.year}:** R&D expense ${abs(int(val)) / 1e9:.3f}B (${abs(int(val)) / 1e6:.0f}M)")
+            lines.append(
+                f"  - **{col.year}:** R&D expense ${abs(int(val)) / 1e9:.3f}B (${abs(int(val)) / 1e6:.0f}M)"
+            )
         return "\n".join(lines) if len(lines) > 1 else ""
     except Exception as e:
         logger.warning(f"yfinance R&D fetch failed for {ticker}: {e}")
@@ -171,11 +177,11 @@ def get_yfinance_income_stmt(ticker: str) -> str:
         def _get_row(keys):
             return next((inc.loc[k] for k in keys if k in inc.index), None)
 
-        rev_row  = _get_row(["Total Revenue", "Revenue"])
-        gp_row   = _get_row(["Gross Profit"])
-        oi_row   = _get_row(["Operating Income", "EBIT"])
+        rev_row = _get_row(["Total Revenue", "Revenue"])
+        gp_row = _get_row(["Gross Profit"])
+        oi_row = _get_row(["Operating Income", "EBIT"])
         opex_row = _get_row(["Operating Expense"])
-        ni_row   = _get_row(["Net Income", "Net Income Common Stockholders"])
+        ni_row = _get_row(["Net Income", "Net Income Common Stockholders"])
         # EPS intentionally excluded: yfinance fiscal-year alignment differs for non-calendar
         # fiscal year companies (e.g. CRWD Jan 31 year-end), causing EPS/Net Income mismatch.
         # EPS is per-share (already in dollars) so denomination errors don't apply — FAISS is safe.
@@ -204,7 +210,9 @@ def get_yfinance_income_stmt(ticker: str) -> str:
         if not lines:
             return ""
 
-        out = ["Income Statement (pre-converted — reproduce Revenue, Gross Profit, Operating Income, Operating Expenses, and Net Income verbatim; read EPS from the filing text):"]
+        out = [
+            "Income Statement (pre-converted — reproduce Revenue, Gross Profit, Operating Income, Operating Expenses, and Net Income verbatim; read EPS from the filing text):"
+        ]
         out.extend(lines)
         return "\n".join(out)
 
@@ -220,8 +228,9 @@ def detect_filing_denomination(content: str) -> str:
     Returns an explicit context note to prepend to Financial Performance context.
     """
     sample = content[:200_000] if content else ""
-    if re.search(r'\(\s*in\s+thousands\b', sample, re.IGNORECASE) or \
-       re.search(r'in\s+thousands,?\s+except', sample, re.IGNORECASE):
+    if re.search(r"\(\s*in\s+thousands\b", sample, re.IGNORECASE) or re.search(
+        r"in\s+thousands,?\s+except", sample, re.IGNORECASE
+    ):
         return (
             "IMPORTANT — UNITS: This filing reports all financial statement figures IN THOUSANDS. "
             "A raw number like 1,305,375 means $1,305,375 thousand = $1.3B. "
@@ -248,7 +257,11 @@ def get_yfinance_cashflow(ticker: str) -> str:
         if cf is None or cf.empty:
             return ""
 
-        ocf_keys = ["Operating Cash Flow", "Total Cash From Operating Activities", "Cash From Operations"]
+        ocf_keys = [
+            "Operating Cash Flow",
+            "Total Cash From Operating Activities",
+            "Cash From Operations",
+        ]
         capex_keys = ["Capital Expenditure", "Capital Expenditures", "Purchase Of Ppe"]
 
         ocf_row = next((cf.loc[k] for k in ocf_keys if k in cf.index), None)
@@ -272,8 +285,14 @@ def get_yfinance_cashflow(ticker: str) -> str:
                     fcf = ocf + capex_val  # capex is negative in yfinance
                     fcf_b = f"${fcf / 1e9:.1f}B"
                     capex_abs = abs(capex_val)
-                    capex_fmt = f"${capex_abs / 1e9:.3f}B" if capex_abs >= 1e9 else f"${capex_abs / 1e6:.0f}M"
-                    lines.append(f"  - **{year}:** Operating Cash Flow {ocf_b} | Free Cash Flow {fcf_b}")
+                    capex_fmt = (
+                        f"${capex_abs / 1e9:.3f}B"
+                        if capex_abs >= 1e9
+                        else f"${capex_abs / 1e6:.0f}M"
+                    )
+                    lines.append(
+                        f"  - **{year}:** Operating Cash Flow {ocf_b} | Free Cash Flow {fcf_b}"
+                    )
                     capex_lines.append(f"  - **{year}:** Capex {capex_fmt}")
                     continue
             lines.append(f"  - **{year}:** Operating Cash Flow {ocf_b}")
@@ -326,11 +345,11 @@ _ABSENCE_LINE_RE = re.compile(
 # Lines that belong in wrong sections or should be stripped unconditionally
 _WRONG_SECTION_LINE_RE = re.compile(
     r"(?i)("
-    r"selling,?\s+general\s+and\s+administrative"   # SG&A leaking into R&D
-    r"|variable\s+selling\s+expenses?"               # SG&A detail
-    r"|uncertain\s+tax\s+positions?"                # MD&A/tax item in Risk Factors
-    r"|critical\s+accounting\s+estimates?"          # MD&A item in Risk Factors
-    r"|accounting\s+standard\s+adoption"            # ASU in any section
+    r"selling,?\s+general\s+and\s+administrative"  # SG&A leaking into R&D
+    r"|variable\s+selling\s+expenses?"  # SG&A detail
+    r"|uncertain\s+tax\s+positions?"  # MD&A/tax item in Risk Factors
+    r"|critical\s+accounting\s+estimates?"  # MD&A item in Risk Factors
+    r"|accounting\s+standard\s+adoption"  # ASU in any section
     # Per-tranche share repurchase lines (date ranges with prices)
     r"|(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d+,\s*\d{4}\s+to\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)"
     # Model-generated YoY progression sentences ("increased from $X ... and further to $Y")
@@ -356,12 +375,13 @@ _WRONG_SECTION_LINE_RE = re.compile(
     r"|non-current\s+asset"
     r"|senior\s+notes?\s+(on|are|will)"  # debt legal entity leaking into subsidiaries
     r"|obligor\s+group"
-    r"|additional\s+paid.in.capital"     # balance sheet leaking into strategic initiatives
+    r"|additional\s+paid.in.capital"  # balance sheet leaking into strategic initiatives
     r"|accumulated\s+deficit"
-    r"|as\s+revised"                     # restatement language
+    r"|as\s+revised"  # restatement language
     r")\b",
     re.IGNORECASE,
 )
+
 
 def _clean_absence_sentences(text: str) -> str:
     """
@@ -373,7 +393,8 @@ def _clean_absence_sentences(text: str) -> str:
 
     # Pass 1: drop absence lines and wrong-section lines
     kept = [
-        ln for ln in lines
+        ln
+        for ln in lines
         if not _ABSENCE_LINE_RE.search(ln) and not _WRONG_SECTION_LINE_RE.search(ln)
     ]
 
@@ -411,6 +432,7 @@ def _clean_absence_sentences(text: str) -> str:
 # LLM output validation with retry
 # ---------------------------------------------------------------------------
 
+
 def validate_llm_response(response: str, context: str = "summary") -> str:
     """Validate LLM output quality. Raises ValueError to trigger retry."""
     if not response or len(response.strip()) < 50:
@@ -447,15 +469,17 @@ async def generate_section(llm, messages: list, context: str = "summary") -> str
             return _clean_absence_sentences(validated)
         except ValueError as e:
             if attempt < 2:
-                wait = (2 ** attempt) + random.uniform(0, 1)  # 1-2s, 2-3s
-                logger.warning(f"Validation failed (attempt {attempt + 1}): {e}. Retrying in {wait:.1f}s...")
+                wait = (2**attempt) + random.uniform(0, 1)  # 1-2s, 2-3s
+                logger.warning(
+                    f"Validation failed (attempt {attempt + 1}): {e}. Retrying in {wait:.1f}s..."
+                )
                 await asyncio.sleep(wait)
             else:
                 logger.error(f"All retries failed: {e}")
                 return "Analysis could not be generated for this section."
         except Exception as e:
             if "429" in str(e) or "Too Many Requests" in str(e):
-                wait = (2 ** attempt) * 15 + random.uniform(0, 5)  # 15-20s, 30-35s, 60-65s
+                wait = (2**attempt) * 15 + random.uniform(0, 5)  # 15-20s, 30-35s, 60-65s
                 logger.warning(f"Rate limit hit (attempt {attempt + 1}/3). Waiting {wait:.1f}s...")
                 await asyncio.sleep(wait)
             else:
@@ -501,7 +525,7 @@ SECTION_PROMPTS = {
         "Every dollar figure must come from the supplemental context.",
         "financial",
         0.65,  # high relevance but some diversity to capture both income stmt and cash flow stmt
-        15,   # extra chunks: needs income stmt + balance sheet + cash flow statement tables
+        15,  # extra chunks: needs income stmt + balance sheet + cash flow statement tables
     ),
     "Risk Factors": (
         "risk factors operational regulatory competitive macro market cybersecurity geopolitical",
@@ -562,24 +586,52 @@ ANALYST_SUFFIX = (
 # ---------------------------------------------------------------------------
 
 REALTIME_KEYWORDS = [
-    "price", "stock price", "share price", "market cap", "p/e", "pe ratio",
-    "today", "current price", "right now", "52 week", "52-week", "trading at",
-    "eps", "earnings per share", "dividend", "yield",
+    "price",
+    "stock price",
+    "share price",
+    "market cap",
+    "p/e",
+    "pe ratio",
+    "today",
+    "current price",
+    "right now",
+    "52 week",
+    "52-week",
+    "trading at",
+    "eps",
+    "earnings per share",
+    "dividend",
+    "yield",
 ]
 
 NEWS_KEYWORDS = [
-    "news", "headline", "recent", "latest news", "announcement", "sentiment",
-    "press release", "analyst rating", "upgrade", "downgrade", "article",
+    "news",
+    "headline",
+    "recent",
+    "latest news",
+    "announcement",
+    "sentiment",
+    "press release",
+    "analyst rating",
+    "upgrade",
+    "downgrade",
+    "article",
 ]
 
 # Casual / small-talk patterns - politely redirect to financial topics
 CASUAL_PATTERNS = [
-    re.compile(r'^\s*(hi|hello|hey|howdy|greetings|sup|yo|hiya)\W*$', re.IGNORECASE),
-    re.compile(r'^\s*(how are you|how do you do|how\'?s it going|what\'?s up|how r u)\W*$', re.IGNORECASE),
-    re.compile(r'^\s*(thanks?|thank you|ty|thx|cheers|great|awesome|cool|nice|ok|okay)\W*$', re.IGNORECASE),
-    re.compile(r'^\s*(who are you|what are you|what\'?s your name|introduce yourself)\W*$', re.IGNORECASE),
-    re.compile(r'^\s*(good (morning|afternoon|evening|night))\W*$', re.IGNORECASE),
-    re.compile(r'^\s*(bye|goodbye|see you|cya|later)\W*$', re.IGNORECASE),
+    re.compile(r"^\s*(hi|hello|hey|howdy|greetings|sup|yo|hiya)\W*$", re.IGNORECASE),
+    re.compile(
+        r"^\s*(how are you|how do you do|how\'?s it going|what\'?s up|how r u)\W*$", re.IGNORECASE
+    ),
+    re.compile(
+        r"^\s*(thanks?|thank you|ty|thx|cheers|great|awesome|cool|nice|ok|okay)\W*$", re.IGNORECASE
+    ),
+    re.compile(
+        r"^\s*(who are you|what are you|what\'?s your name|introduce yourself)\W*$", re.IGNORECASE
+    ),
+    re.compile(r"^\s*(good (morning|afternoon|evening|night))\W*$", re.IGNORECASE),
+    re.compile(r"^\s*(bye|goodbye|see you|cya|later)\W*$", re.IGNORECASE),
 ]
 
 
@@ -590,6 +642,7 @@ def is_casual_chat(question: str) -> bool:
 # ---------------------------------------------------------------------------
 # Background processing
 # ---------------------------------------------------------------------------
+
 
 async def process_filing_background(
     ticker: str, job_id: str, analyze_mode: str = "analyst", form_type: str = "10-K"
@@ -607,6 +660,7 @@ async def process_filing_background(
 
     async with ticker_locks[ticker]:
         try:
+
             def update(progress: str, status: str = "processing") -> None:
                 jobs[job_id] = {**jobs[job_id], "progress": progress, "status": status}
                 logger.info(f"[{ticker}] {progress}")
@@ -649,7 +703,9 @@ async def process_filing_background(
             # Check cache BEFORE downloading text - text download is the slow step
             if faiss_manager.needs_rebuild(ticker, accession_number, form_type):
                 # New or changed filing - evict stale analysis cache entries
-                stale_keys = [k for k in analysis_cache if k == ticker or k.startswith(f"{ticker}:")]
+                stale_keys = [
+                    k for k in analysis_cache if k == ticker or k.startswith(f"{ticker}:")
+                ]
                 for k in stale_keys:
                     del analysis_cache[k]
                 if stale_keys:
@@ -691,12 +747,16 @@ async def process_filing_background(
 
             if faiss_manager.load_store(ticker, form_type):
                 retrievers = [
-                    faiss_manager.get_mmr_retriever(ticker, form_type=form_type, k=k, lambda_mult=lm)
+                    faiss_manager.get_mmr_retriever(
+                        ticker, form_type=form_type, k=k, lambda_mult=lm
+                    )
                     for _, (_, _, _, lm, k) in section_items
                 ]
                 all_docs = await asyncio.gather(
-                    *[asyncio.to_thread(r.invoke, rq)
-                      for r, (_, (rq, _, _, _, _)) in zip(retrievers, section_items)]
+                    *[
+                        asyncio.to_thread(r.invoke, rq)
+                        for r, (_, (rq, _, _, _, _)) in zip(retrievers, section_items)
+                    ]
                 )
                 contexts = ["\n\n---\n\n".join(d.page_content for d in docs) for docs in all_docs]
 
@@ -738,7 +798,9 @@ async def process_filing_background(
                     contexts[strat_idx] += f"\n\n---\n\n{div_data}"
                 else:
                     # Explicit signal so model doesn't hallucinate dividend figures
-                    contexts[strat_idx] += "\n\nDividend note: No dividend data found for this company — do not include dividend per share in Capital Allocation."
+                    contexts[strat_idx] += (
+                        "\n\nDividend note: No dividend data found for this company — do not include dividend per share in Capital Allocation."
+                    )
                 # Inject cash flow supplement into Strategic Initiatives so capex figures are available
                 if cf_data:
                     contexts[strat_idx] += f"\n\n---\n\n{cf_data}"
@@ -747,7 +809,9 @@ async def process_filing_background(
                 if rd_data:
                     contexts[strat_idx] += f"\n\n---\n\n{rd_data}"
                 # Note: SEC share repurchase tables report share counts in thousands
-                contexts[strat_idx] += "\n\nNote: Share counts in SEC filings are in thousands (e.g., '89,498' means 89,498 thousand = 89.5 million shares)."
+                contexts[strat_idx] += (
+                    "\n\nNote: Share counts in SEC filings are in thousands (e.g., '89,498' means 89,498 thousand = 89.5 million shares)."
+                )
             elif content:
                 contexts = [content[:3000]] * len(section_items)
             else:
@@ -772,15 +836,25 @@ async def process_filing_background(
 
                 _t = time.time()
                 answer = await generate_section(llm, messages, context=context_type)
-                logger.info(f"[{ticker}] Section {i}/5 ({section_title}) took {time.time() - _t:.1f}s | {len(answer)} chars")
+                logger.info(
+                    f"[{ticker}] Section {i}/5 ({section_title}) took {time.time() - _t:.1f}s | {len(answer)} chars"
+                )
                 sections.append({"title": section_title, "content": answer})
 
             update("Generating financial charts...")
             try:
-                chart_company, chart_xbrs = await asyncio.to_thread(get_company_filings_data, ticker)
-                income_plot = await asyncio.to_thread(plot_revenue, ticker, chart_company, chart_xbrs)
-                balance_plot = await asyncio.to_thread(plot_balance_sheet, ticker, chart_company, chart_xbrs)
-                cashflow_plot = await asyncio.to_thread(plot_cash_flow, ticker, chart_company, chart_xbrs)
+                chart_company, chart_xbrs = await asyncio.to_thread(
+                    get_company_filings_data, ticker
+                )
+                income_plot = await asyncio.to_thread(
+                    plot_revenue, ticker, chart_company, chart_xbrs
+                )
+                balance_plot = await asyncio.to_thread(
+                    plot_balance_sheet, ticker, chart_company, chart_xbrs
+                )
+                cashflow_plot = await asyncio.to_thread(
+                    plot_cash_flow, ticker, chart_company, chart_xbrs
+                )
                 financial_charts = {
                     "income_statement": income_plot,
                     "balance_sheet": balance_plot,
@@ -804,8 +878,7 @@ async def process_filing_background(
 
             # Only cache if all sections generated successfully
             all_ok = all(
-                "Unable to retrieve information" not in str(s.get("content", ""))
-                for s in sections
+                "Unable to retrieve information" not in str(s.get("content", "")) for s in sections
             )
             if all_ok:
                 analysis_cache[f"{ticker}:{form_type}:{analyze_mode}"] = result
@@ -834,13 +907,15 @@ async def process_filing_background(
 # Lifespan
 # ---------------------------------------------------------------------------
 
+
 async def _cleanup_jobs():
     """Remove completed/error jobs older than 30 minutes to prevent unbounded memory growth."""
     while True:
         await asyncio.sleep(300)  # run every 5 minutes
         cutoff = time.time() - 1800  # 30 minutes
         stale = [
-            jid for jid, job in jobs.items()
+            jid
+            for jid, job in jobs.items()
             if job.get("status") in ("complete", "error")
             and job.get("created_at", time.time()) < cutoff
         ]
@@ -917,7 +992,11 @@ def fetch_company_database() -> list[dict]:
         name_idx = fields.index("name")
         ticker_idx = fields.index("ticker")
         _company_db = [
-            {"ticker": row[ticker_idx].upper(), "cik": str(row[cik_idx]).zfill(10), "title": row[name_idx]}
+            {
+                "ticker": row[ticker_idx].upper(),
+                "cik": str(row[cik_idx]).zfill(10),
+                "title": row[name_idx],
+            }
             for row in data["data"]
             if row[ticker_idx]
         ]
@@ -939,12 +1018,14 @@ def rank_search_results(companies: list[dict], query: str) -> list[dict]:
         if n.startswith(q):
             return 2
         return 3
+
     return sorted(companies, key=score)
 
 
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @app.get("/health")
 async def health():
@@ -957,7 +1038,9 @@ def company_search(q: str = Query(...)):
         return {"results": []}
     companies = fetch_company_database()
     q_upper = q.upper()
-    matching = [c for c in companies if q_upper in c["title"].upper() or q_upper in c["ticker"].upper()]
+    matching = [
+        c for c in companies if q_upper in c["title"].upper() or q_upper in c["ticker"].upper()
+    ]
     return {"results": rank_search_results(matching, q)[:10]}
 
 
@@ -966,7 +1049,9 @@ async def analyze_filing(
     ticker: str,
     bg: BackgroundTasks,
     analyze_mode: str = Query("analyst", description="'executive' or 'analyst'"),
-    form_type: str = Query("10-K", description="Filing type: '10-K' (annual) or '10-Q' (quarterly)"),
+    form_type: str = Query(
+        "10-K", description="Filing type: '10-K' (annual) or '10-Q' (quarterly)"
+    ),
 ):
     """
     Initiate async filing download and analysis.
@@ -987,7 +1072,12 @@ async def analyze_filing(
         return {"job_id": job_id}
 
     job_id = str(uuid4())
-    jobs[job_id] = {"job_id": job_id, "status": "processing", "progress": "Starting...", "created_at": time.time()}
+    jobs[job_id] = {
+        "job_id": job_id,
+        "status": "processing",
+        "progress": "Starting...",
+        "created_at": time.time(),
+    }
     active_jobs.add(job_id)
     bg.add_task(process_filing_background, ticker, job_id, analyze_mode, form_type)
     return {"job_id": job_id}
@@ -1033,7 +1123,10 @@ async def clear_cache_variant(ticker: str, form_type: str, mode: str):
         del analysis_cache[ticker]
         removed.append(ticker)
     if not removed:
-        raise HTTPException(status_code=404, detail=f"No cache entry found for {ticker} · {form_type} · {mode.capitalize()}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No cache entry found for {ticker} · {form_type} · {mode.capitalize()}",
+        )
     return {"cleared": f"{ticker} · {form_type} · {mode.capitalize()}"}
 
 
@@ -1063,7 +1156,9 @@ async def ask(
         try:
             # ── Casual chat guardrail ────────────────────────────────────────
             if is_casual_chat(question):
-                cached = analysis_cache.get(ticker) or analysis_cache.get(f"{ticker}:{form_type}:analyst")
+                cached = analysis_cache.get(ticker) or analysis_cache.get(
+                    f"{ticker}:{form_type}:analyst"
+                )
                 company_name = cached.get("company_name", ticker) if cached else ticker
                 greeting = (
                     f"Hello! I'm **FinSight AI** - a financial analyst specialized in SEC 10-K and 10-Q filings.\n\n"
@@ -1088,6 +1183,7 @@ async def ask(
             if is_news:
                 try:
                     import feedparser
+
                     rss_url = (
                         f"https://feeds.finance.yahoo.com/rss/2.0/headline"
                         f"?s={ticker}&region=US&lang=en-US"
@@ -1095,9 +1191,8 @@ async def ask(
                     feed = await asyncio.to_thread(feedparser.parse, rss_url)
                     headlines = [e.title for e in feed.entries[:8]]
                     if headlines:
-                        news_context = (
-                            f"**Recent news headlines for {ticker}:**\n"
-                            + "\n".join(f"- {h}" for h in headlines)
+                        news_context = f"**Recent news headlines for {ticker}:**\n" + "\n".join(
+                            f"- {h}" for h in headlines
                         )
                         source = "realtime"
                 except Exception as news_err:
@@ -1135,11 +1230,13 @@ async def ask(
                     # FAISS retrieval is synchronous - run in thread to avoid blocking event loop
                     docs = await asyncio.to_thread(retriever.invoke, question)
                     doc_context = "\n\n---\n\n".join(d.page_content for d in docs)
-                    cited_sections = sorted(set(
-                        d.metadata.get("section", "")
-                        for d in docs
-                        if d.metadata.get("section") and d.metadata["section"] != "General"
-                    ))
+                    cited_sections = sorted(
+                        set(
+                            d.metadata.get("section", "")
+                            for d in docs
+                            if d.metadata.get("section") and d.metadata["section"] != "General"
+                        )
+                    )
                     source = "realtime" if live_context else "document"
                     if live_context:
                         source = "hybrid"
@@ -1216,15 +1313,16 @@ async def ask(
 # PDF rendering helpers (shared by both export endpoints)
 # ---------------------------------------------------------------------------
 
+
 def _pdf_s(text: str) -> str:
     """Sanitize string to Latin-1 for FPDF (replaces non-encodable chars)."""
-    return str(text).encode('latin-1', errors='replace').decode('latin-1')
+    return str(text).encode("latin-1", errors="replace").decode("latin-1")
 
 
 def _pdf_clean_inline(s: str) -> str:
     """Strip markdown bold/italic/code markers, keeping content (Latin-1 safe)."""
-    s = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', s)
-    s = re.sub(r'`{1,3}(.*?)`{1,3}', r'\1', s, flags=re.DOTALL)
+    s = re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", s)
+    s = re.sub(r"`{1,3}(.*?)`{1,3}", r"\1", s, flags=re.DOTALL)
     return _pdf_s(s).strip()
 
 
@@ -1238,7 +1336,7 @@ def _pdf_render_content(pdf_obj, text: str) -> None:
 
     def flush_para() -> None:
         if para_lines:
-            para = ' '.join(para_lines).strip()
+            para = " ".join(para_lines).strip()
             if para:
                 pdf_obj.set_font("Helvetica", "", 10)
                 pdf_obj.set_text_color(50, 50, 50)
@@ -1247,17 +1345,17 @@ def _pdf_render_content(pdf_obj, text: str) -> None:
                 pdf_obj.ln(1)
             para_lines.clear()
 
-    for raw_line in text.split('\n'):
+    for raw_line in text.split("\n"):
         s = raw_line.strip()
-        if re.match(r'^[-*_]{3,}$', s):
+        if re.match(r"^[-*_]{3,}$", s):
             flush_para()
             continue
         if not s:
             flush_para()
             continue
-        if s.startswith('#'):
+        if s.startswith("#"):
             flush_para()
-            heading = _pdf_clean_inline(re.sub(r'^#+\s*', '', s))
+            heading = _pdf_clean_inline(re.sub(r"^#+\s*", "", s))
             if heading:
                 pdf_obj.ln(2)
                 pdf_obj.set_font("Helvetica", "B", 10)
@@ -1266,17 +1364,22 @@ def _pdf_render_content(pdf_obj, text: str) -> None:
                 y_pos = pdf_obj.get_y()
                 pdf_obj.set_draw_color(200, 200, 200)
                 pdf_obj.set_line_width(0.2)
-                pdf_obj.line(pdf_obj.l_margin, y_pos, pdf_obj.l_margin + min(len(heading) * 2.6, usable_w), y_pos)
+                pdf_obj.line(
+                    pdf_obj.l_margin,
+                    y_pos,
+                    pdf_obj.l_margin + min(len(heading) * 2.6, usable_w),
+                    y_pos,
+                )
                 pdf_obj.ln(2)
             continue
-        if re.match(r'^[-*+\xb7]\s+', s):
+        if re.match(r"^[-*+\xb7]\s+", s):
             flush_para()
-            content = _pdf_clean_inline(re.sub(r'^[-*+\xb7]\s+', '', s))
+            content = _pdf_clean_inline(re.sub(r"^[-*+\xb7]\s+", "", s))
             if content:
                 pdf_obj.set_font("Helvetica", "", 10)
                 pdf_obj.set_text_color(50, 50, 50)
                 pdf_obj.set_x(pdf_obj.l_margin + 5)
-                pdf_obj.multi_cell(usable_w - 5, 6, f'\xb7  {content}')
+                pdf_obj.multi_cell(usable_w - 5, 6, f"\xb7  {content}")
             continue
         para_lines.append(_pdf_clean_inline(s))
 
@@ -1311,15 +1414,21 @@ async def export_pdf(payload: dict[str, Any] = Body(...)):
     pdf.set_text_color(110, 110, 110)
     filing_form = cached.get("form_type", form_type)
     pdf.cell(
-        0, 5,
-        _pdf_s(f"SEC {filing_form} Filing Analysis  |  Filing Date: {cached['filing_date']}  |  FinSight AI"),
-        new_x="LMARGIN", new_y="NEXT",
+        0,
+        5,
+        _pdf_s(
+            f"SEC {filing_form} Filing Analysis  |  Filing Date: {cached['filing_date']}  |  FinSight AI"
+        ),
+        new_x="LMARGIN",
+        new_y="NEXT",
     )
     cached_mode = cached.get("analyze_mode", analyze_mode)
     pdf.cell(
-        0, 5,
+        0,
+        5,
         _pdf_s(f"LLM Provider: {cached['provider']}  |  Analysis Mode: {cached_mode.title()}"),
-        new_x="LMARGIN", new_y="NEXT",
+        new_x="LMARGIN",
+        new_y="NEXT",
     )
     pdf.ln(3)
 
@@ -1337,12 +1446,17 @@ async def export_pdf(payload: dict[str, Any] = Body(...)):
         pdf.cell(0, 7, "Company Profile", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(70, 70, 70)
-        metrics_line = "  |  ".join(filter(None, [
-            f"CIK: {profile.get('cik', 'N/A')}",
-            f"SIC: {profile.get('sic_code', 'N/A')}",
-            f"Industry: {profile.get('industry', 'N/A')}",
-            f"Fiscal Year End: {profile.get('fiscal_year_end', 'N/A')}",
-        ]))
+        metrics_line = "  |  ".join(
+            filter(
+                None,
+                [
+                    f"CIK: {profile.get('cik', 'N/A')}",
+                    f"SIC: {profile.get('sic_code', 'N/A')}",
+                    f"Industry: {profile.get('industry', 'N/A')}",
+                    f"Fiscal Year End: {profile.get('fiscal_year_end', 'N/A')}",
+                ],
+            )
+        )
         pdf.cell(0, 5, _pdf_s(metrics_line), new_x="LMARGIN", new_y="NEXT")
         addr = profile.get("business_address")
         if addr:
@@ -1442,14 +1556,15 @@ async def export_pdf(payload: dict[str, Any] = Body(...)):
     pdf.set_text_color(160, 160, 160)
     ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     pdf.cell(
-        0, 5,
+        0,
+        5,
         f"FinSight AI  |  Generated {ts}  |  For informational purposes only. Not financial advice.",
         align="C",
     )
 
     pdf_bytes = bytes(pdf.output())
-    safe_form = filing_form.replace("-", "")          # "10K" or "10Q"
-    mode_cap = cached_mode.title()                     # "Analyst" or "Executive"
+    safe_form = filing_form.replace("-", "")  # "10K" or "10Q"
+    mode_cap = cached_mode.title()  # "Analyst" or "Executive"
     filename = f"FinSight_AI_{ticker}_{safe_form}_{mode_cap}_{cached['filing_date']}.pdf"
     return Response(
         content=pdf_bytes,
@@ -1483,11 +1598,31 @@ async def export_pdf_compare(payload: dict[str, Any] = Body(...)):
     # ── Title ─────────────────────────────────────────────────────────────────
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(20, 20, 20)
-    pdf.cell(0, 11, _pdf_s(f"{c1.get('name', t1)} vs {c2.get('name', t2)}"), new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(
+        0,
+        11,
+        _pdf_s(f"{c1.get('name', t1)} vs {c2.get('name', t2)}"),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(110, 110, 110)
-    pdf.cell(0, 5, _pdf_s(f"{t1}: {c1.get('form_type','10-K')} ({c1.get('filing_date','')})  |  {t2}: {c2.get('form_type','10-K')} ({c2.get('filing_date','')})"), new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 5, _pdf_s(f"Analysis Mode: {analyze_mode.title()}  |  FinSight AI"), new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(
+        0,
+        5,
+        _pdf_s(
+            f"{t1}: {c1.get('form_type','10-K')} ({c1.get('filing_date','')})  |  {t2}: {c2.get('form_type','10-K')} ({c2.get('filing_date','')})"
+        ),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
+    pdf.cell(
+        0,
+        5,
+        _pdf_s(f"Analysis Mode: {analyze_mode.title()}  |  FinSight AI"),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
     pdf.ln(3)
     pdf.set_draw_color(59, 130, 246)
     pdf.set_line_width(0.6)
@@ -1501,12 +1636,17 @@ async def export_pdf_compare(payload: dict[str, Any] = Body(...)):
         cp = company_data.get("company_profile", {})
         if not cp:
             continue
-        meta = "  |  ".join(filter(None, [
-            f"CIK: {cp.get('cik', 'N/A')}",
-            f"SIC: {cp.get('sic_code', 'N/A')}",
-            f"Industry: {cp.get('industry', 'N/A')}",
-            f"FYE: {cp.get('fiscal_year_end', 'N/A')}",
-        ]))
+        meta = "  |  ".join(
+            filter(
+                None,
+                [
+                    f"CIK: {cp.get('cik', 'N/A')}",
+                    f"SIC: {cp.get('sic_code', 'N/A')}",
+                    f"Industry: {cp.get('industry', 'N/A')}",
+                    f"FYE: {cp.get('fiscal_year_end', 'N/A')}",
+                ],
+            )
+        )
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(0, 5, _pdf_s(f"{ticker_label}:"), new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 9)
@@ -1567,7 +1707,12 @@ async def export_pdf_compare(payload: dict[str, Any] = Body(...)):
     pdf.set_font("Helvetica", "I", 7)
     pdf.set_text_color(160, 160, 160)
     ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
-    pdf.cell(0, 5, f"FinSight AI  |  Generated {ts}  |  For informational purposes only. Not financial advice.", align="C")
+    pdf.cell(
+        0,
+        5,
+        f"FinSight AI  |  Generated {ts}  |  For informational purposes only. Not financial advice.",
+        align="C",
+    )
 
     pdf_bytes = bytes(pdf.output())
     ft = c1.get("form_type", "10-K").replace("-", "")
@@ -1613,22 +1758,24 @@ async def compare(ticker1: str = Query(...), ticker2: str = Query(...)):
     llm = get_llm()
     messages = [
         SystemMessage(content=SYSTEM_PROMPT),
-        HumanMessage(content=(
-            f"You are comparing {c1['company_name']} ({t1}) vs {c2['company_name']} ({t2}) "
-            f"based on their most recent SEC filings.\n\n"
-            f"You MUST always generate a full comparison - never say 'unable to retrieve'. "
-            f"Use only the filing data provided below. If a specific metric is not available, "
-            f"note it briefly and move on.\n\n"
-            f"Structure your response with these exact sections:\n"
-            f"### Key Differences\n"
-            f"List 5 specific differences (business model, revenue scale, margins, risk profile, strategy).\n"
-            f"### Notable Similarities\n"
-            f"List 2-3 genuine similarities.\n"
-            f"### Investment Considerations\n"
-            f"1-2 sentences on what each company's filing suggests about its near-term outlook.\n\n"
-            f"Use **bold** for all metrics and company names. Be specific with numbers where available.\n\n"
-            f"Filing data:{comparison_context}"
-        )),
+        HumanMessage(
+            content=(
+                f"You are comparing {c1['company_name']} ({t1}) vs {c2['company_name']} ({t2}) "
+                f"based on their most recent SEC filings.\n\n"
+                f"You MUST always generate a full comparison - never say 'unable to retrieve'. "
+                f"Use only the filing data provided below. If a specific metric is not available, "
+                f"note it briefly and move on.\n\n"
+                f"Structure your response with these exact sections:\n"
+                f"### Key Differences\n"
+                f"List 5 specific differences (business model, revenue scale, margins, risk profile, strategy).\n"
+                f"### Notable Similarities\n"
+                f"List 2-3 genuine similarities.\n"
+                f"### Investment Considerations\n"
+                f"1-2 sentences on what each company's filing suggests about its near-term outlook.\n\n"
+                f"Use **bold** for all metrics and company names. Be specific with numbers where available.\n\n"
+                f"Filing data:{comparison_context}"
+            )
+        ),
     ]
     key_differences = await generate_section(llm, messages, context="summary")
 
@@ -1661,8 +1808,7 @@ async def news_sentiment(ticker: str = Query(...)):
 
     ticker = ticker.upper()
     rss_url = (
-        f"https://feeds.finance.yahoo.com/rss/2.0/headline"
-        f"?s={ticker}&region=US&lang=en-US"
+        f"https://feeds.finance.yahoo.com/rss/2.0/headline" f"?s={ticker}&region=US&lang=en-US"
     )
 
     try:
@@ -1688,8 +1834,30 @@ async def news_sentiment(ticker: str = Query(...)):
         }
 
     # Keyword-based sentiment score
-    positive_words = ["beat", "surpass", "growth", "strong", "record", "gain", "rises", "upgrade", "buy", "profit"]
-    negative_words = ["miss", "decline", "falls", "weak", "loss", "cut", "downgrade", "sell", "risk", "lawsuit"]
+    positive_words = [
+        "beat",
+        "surpass",
+        "growth",
+        "strong",
+        "record",
+        "gain",
+        "rises",
+        "upgrade",
+        "buy",
+        "profit",
+    ]
+    negative_words = [
+        "miss",
+        "decline",
+        "falls",
+        "weak",
+        "loss",
+        "cut",
+        "downgrade",
+        "sell",
+        "risk",
+        "lawsuit",
+    ]
     all_text = " ".join(h["title"].lower() for h in headlines)
     pos = sum(1 for w in positive_words if w in all_text)
     neg = sum(1 for w in negative_words if w in all_text)
@@ -1700,13 +1868,15 @@ async def news_sentiment(ticker: str = Query(...)):
     llm = get_llm()
     messages = [
         SystemMessage(content=SYSTEM_PROMPT),
-        HumanMessage(content=(
-            f"Analyze the sentiment of these recent news headlines for {ticker}. "
-            f"Provide:\n1) **Overall Sentiment** (Positive / Neutral / Negative) with one-line rationale\n"
-            f"2) **Key Themes** - 2-3 bullet points on what the news is focused on\n"
-            f"3) **Market Implication** - one sentence on what this signals for investors\n\n"
-            f"Headlines:\n{headline_text}"
-        )),
+        HumanMessage(
+            content=(
+                f"Analyze the sentiment of these recent news headlines for {ticker}. "
+                f"Provide:\n1) **Overall Sentiment** (Positive / Neutral / Negative) with one-line rationale\n"
+                f"2) **Key Themes** - 2-3 bullet points on what the news is focused on\n"
+                f"3) **Market Implication** - one sentence on what this signals for investors\n\n"
+                f"Headlines:\n{headline_text}"
+            )
+        ),
     ]
     summary = await generate_section(llm, messages, context="summary")
 
@@ -1735,7 +1905,9 @@ def get_cache():
         grouped.setdefault(ticker, []).append(f"{form_type} ({mode.capitalize()})")
     # Sort each ticker's variants: Executive before Analyst, 10-K before 10-Q
     for ticker in grouped:
-        grouped[ticker] = sorted(grouped[ticker], key=lambda v: (v.split()[0], 0 if "Executive" in v else 1))
+        grouped[ticker] = sorted(
+            grouped[ticker], key=lambda v: (v.split()[0], 0 if "Executive" in v else 1)
+        )
     return {"cached": grouped, "total_tickers": len(grouped)}
 
 

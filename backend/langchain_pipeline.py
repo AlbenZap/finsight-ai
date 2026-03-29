@@ -49,6 +49,7 @@ def get_llm():
     try:
         if provider == "ollama":
             from langchain_ollama import ChatOllama
+
             llm = ChatOllama(
                 model=os.getenv("OLLAMA_MODEL", "llama3.1:8b"),
                 base_url=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434"),
@@ -57,8 +58,11 @@ def get_llm():
         else:
             api_key = os.getenv("NVIDIA_API_KEY")
             if not api_key:
-                raise RuntimeError("NVIDIA_API_KEY environment variable is required when LLM_PROVIDER=nvidia_nim")
+                raise RuntimeError(
+                    "NVIDIA_API_KEY environment variable is required when LLM_PROVIDER=nvidia_nim"
+                )
             from langchain_nvidia_ai_endpoints import ChatNVIDIA
+
             llm = ChatNVIDIA(
                 model=os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct"),
                 api_key=api_key,

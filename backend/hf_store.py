@@ -38,6 +38,7 @@ def ensure_repo_exists() -> bool:
         return False
     try:
         from huggingface_hub import HfApi
+
         api = HfApi(token=token)
         api.create_repo(repo_id=repo_id, repo_type="dataset", private=True, exist_ok=True)
         logger.info(f"HF Dataset repo ready: {repo_id}")
@@ -69,6 +70,7 @@ def upload_store(store_path: Path, ticker: str, form_type: str) -> bool:
 
     try:
         from huggingface_hub import HfApi
+
         api = HfApi(token=token)
         api.upload_folder(
             folder_path=str(store_path),
@@ -98,6 +100,7 @@ def restore_all_stores(base_dir: Path) -> int:
 
     try:
         from huggingface_hub import snapshot_download
+
         snapshot_download(
             repo_id=repo_id,
             repo_type="dataset",
