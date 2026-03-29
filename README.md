@@ -29,7 +29,7 @@ React (Vercel)
 
 FastAPI Backend (HuggingFace Spaces)
         ├── LLM: NVIDIA NIM → Llama 3.1 8B (cloud, default)
-        │         Ollama → Llama 3.1 8B (self-hosted)
+        │         Ollama → Llama 3.1 8B (self-hosted alt)
         ├── RAG: FAISS + BGE-base embeddings + MMR retrieval + ticker metadata filter
         ├── Pipeline: classify query → retrieve docs / fetch live data → stream response
         ├── Data: SEC EDGAR via EdgarTools + yfinance (live market data)
@@ -75,7 +75,7 @@ cd frontend && npm install && npm start
 # 4. Open http://localhost:3000
 ```
 
-> **Ollama mode (self-hosted, no API key):** use `make dev-ollama` in step 2 - starts backend + Ollama together. First-time: `make ollama-pull` to download the model.
+> **Ollama mode (self-hosted alternate, no API key):** use `make dev-ollama` in step 2 - starts backend + Ollama together. First-time: `make ollama-pull` to download the model.
 
 ### Enable LangSmith observability (optional)
 

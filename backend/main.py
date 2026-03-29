@@ -1032,6 +1032,15 @@ async def health():
     return {"status": "ok", "provider": get_provider_name()}
 
 
+@app.get("/company_name/{ticker}")
+def company_name(ticker: str):
+    """Resolve a ticker to its company name using the SEC company database."""
+    companies = fetch_company_database()
+    ticker_upper = ticker.upper()
+    match = next((c for c in companies if c["ticker"].upper() == ticker_upper), None)
+    return {"ticker": ticker_upper, "company_name": match["title"] if match else ticker_upper}
+
+
 @app.get("/company_search/")
 def company_search(q: str = Query(...)):
     if not q or len(q) < 2:
@@ -1888,19 +1897,30 @@ def get_vector_stores():
     return {"available_stores": stores, "total_count": len(stores)}
 
 
+@app.post("/sync_stores/")
+async def sync_stores():
+    """Pull any new FAISS indexes from HF Dataset repo without restarting the Space."""
+    count = await asyncio.to_thread(hf_store.restore_all_stores, faiss_manager.base_dir)
+    stores = faiss_manager.list_stores()
+    return {"synced": count, "available_stores": stores}
+
+
 @app.get("/cache/")
 def get_cache():
     """List all tickers currently in the in-memory analysis cache."""
-    grouped: dict[str, list] = {}
+    grouped: dict[str, dict] = {}
     for key in analysis_cache:
         if ":" not in key:
             continue  # skip bare-ticker aliases
         ticker, form_type, mode = key.split(":", 2)
-        grouped.setdefault(ticker, []).append(f"{form_type} ({mode.capitalize()})")
+        if ticker not in grouped:
+            company_name = analysis_cache[key].get("company_name", ticker)
+            grouped[ticker] = {"company_name": company_name, "variants": []}
+        grouped[ticker]["variants"].append(f"{form_type} ({mode.capitalize()})")
     # Sort each ticker's variants: Executive before Analyst, 10-K before 10-Q
     for ticker in grouped:
-        grouped[ticker] = sorted(
-            grouped[ticker], key=lambda v: (v.split()[0], 0 if "Executive" in v else 1)
+        grouped[ticker]["variants"] = sorted(
+            grouped[ticker]["variants"], key=lambda v: (v.split()[0], 0 if "Executive" in v else 1)
         )
     return {"cached": grouped, "total_tickers": len(grouped)}
 

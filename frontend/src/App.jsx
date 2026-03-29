@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
-import { Analytics } from '@vercel/analytics/react';
 
 const API = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
@@ -439,31 +438,41 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    Promise.all([
-      axios.get(`${API}/cache/`).catch(() => ({ data: { cached: {} } })),
-      axios.get(`${API}/vector_stores/`).catch(() => ({ data: { available_stores: [] } })),
-    ]).then(([cacheRes, storeRes]) => {
+    (async () => {
+      // Fire sync in background, fetch cache + stores immediately
+      axios.post(`${API}/sync_stores/`).catch(() => {});
+      const [cacheRes, storeRes] = await Promise.all([
+        axios.get(`${API}/cache/`).catch(() => ({ data: { cached: {} } })),
+        axios.get(`${API}/vector_stores/`).catch(() => ({ data: { available_stores: [] } })),
+      ]);
       const cached = cacheRes.data.cached || {};
       const analyses = [];
       const cachedCombos = new Set();
-      for (const [ticker, variants] of Object.entries(cached)) {
+      for (const [ticker, entry] of Object.entries(cached)) {
+        const companyName = entry.company_name || ticker;
+        const variants = entry.variants || [];
         for (const variant of variants) {
           const m = variant.match(/^([\w-]+)\s+\((\w+)\)$/);
           if (m) {
             const ft = m[1], mode = m[2].toLowerCase();
-            analyses.push({ ticker, formType: ft, mode });
+            analyses.push({ ticker, formType: ft, mode, companyName });
             cachedCombos.add(`${ticker}:${ft}`);
           }
         }
       }
       setCachedAnalyses(analyses.sort((a, b) => a.ticker.localeCompare(b.ticker)));
       const stores = storeRes.data.available_stores || [];
-      const indexOnly = stores
+      const indexOnlyRaw = stores
         .filter(s => !cachedCombos.has(s))
         .map(s => { const [ticker, formType] = s.split(':'); return { ticker, formType }; })
         .sort((a, b) => a.ticker.localeCompare(b.ticker));
-      setIndexOnlyTickers(indexOnly);
-    });
+      const uniqueTickers = [...new Set(indexOnlyRaw.map(e => e.ticker))];
+      const nameMap = {};
+      await Promise.all(uniqueTickers.map(t =>
+        axios.get(`${API}/company_name/${t}`).then(r => { nameMap[t] = r.data.company_name; }).catch(() => { nameMap[t] = t; })
+      ));
+      setIndexOnlyTickers(indexOnlyRaw.map(e => ({ ...e, companyName: nameMap[e.ticker] || e.ticker })));
+    })();
   }, [homeRefreshKey]);
 
   useEffect(() => {
@@ -946,8 +955,9 @@ export default function App() {
                         <div className="flex items-center gap-2 mb-1.5 ml-3">
                           <span className="text-[10px] text-gray-600 w-16 shrink-0">Executive</span>
                           <div className="flex flex-wrap gap-1.5">
-                            {executive.map(({ ticker }) => (
+                            {executive.map(({ ticker, companyName }) => (
                               <button key={`${ticker}:${ft}:executive`} onClick={() => handleQuickLoad(ticker, ft, 'executive')}
+                                title={companyName}
                                 className="text-[11px] font-mono bg-green-500/10 text-green-400 border border-green-500/20 px-2.5 py-1 rounded hover:bg-green-500/20 transition-colors">
                                 {ticker}
                               </button>
@@ -959,8 +969,9 @@ export default function App() {
                         <div className="flex items-center gap-2 ml-3">
                           <span className="text-[10px] text-gray-600 w-16 shrink-0">Analyst</span>
                           <div className="flex flex-wrap gap-1.5">
-                            {analyst.map(({ ticker }) => (
+                            {analyst.map(({ ticker, companyName }) => (
                               <button key={`${ticker}:${ft}:analyst`} onClick={() => handleQuickLoad(ticker, ft, 'analyst')}
+                                title={companyName}
                                 className="text-[11px] font-mono bg-green-500/10 text-green-400 border border-green-500/20 px-2.5 py-1 rounded hover:bg-green-500/20 transition-colors">
                                 {ticker}
                               </button>
@@ -985,10 +996,11 @@ export default function App() {
                     <div key={ft} className="mb-3">
                       <p className="text-[11px] text-gray-600 font-mono mb-1.5">{ft}</p>
                       <div className="flex flex-wrap gap-1.5 ml-3">
-                        {entries.map(({ ticker }) => (
+                        {entries.map(({ ticker, companyName }) => (
                           <button
                             key={`${ticker}:${ft}`}
                             onClick={() => handleQuickLoad(ticker, ft, analyzeMode)}
+                            title={companyName}
                             className="text-[11px] font-mono bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2.5 py-1 rounded hover:bg-violet-500/20 transition-colors"
                           >
                             {ticker}
@@ -1442,7 +1454,6 @@ export default function App() {
         </p>
       </footer>
     </div>
-    <Analytics />
     </>
   );
 }
