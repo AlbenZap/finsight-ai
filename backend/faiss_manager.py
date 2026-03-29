@@ -6,20 +6,20 @@ Features: MMR retrieval, ticker metadata filtering, section tagging, smart cachi
 financial table preservation during chunking.
 """
 
-import logging
 import hashlib
 import json
+import logging
 import re
-import torch
-from typing import Optional, List, Dict, Any
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+import torch
 from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 logger = logging.getLogger(__name__)
 
@@ -104,11 +104,11 @@ class BGEEmbeddings(Embeddings):
         self._query_instruction = query_instruction
         self._embed_instruction = embed_instruction
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
         prefixed = [f"{self._embed_instruction}{t}" for t in texts]
         return self._hf.embed_documents(prefixed)
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         return self._hf.embed_query(f"{self._query_instruction}{text}")
 
     def __call__(self, input_texts):
@@ -125,7 +125,7 @@ class FAISSVectorManager:
         self.base_dir.mkdir(exist_ok=True)
         self.embeddings_model = None
         # In-memory cache: avoids re-loading FAISS from disk on every Q&A call
-        self._store_cache: Dict[str, FAISS] = {}
+        self._store_cache: dict[str, FAISS] = {}
 
     def get_embeddings_model(self) -> BGEEmbeddings:
         """Get or create cached BGE embeddings model. Detects MPS/CUDA/CPU automatically."""
@@ -174,11 +174,11 @@ class FAISSVectorManager:
             json.dump(metadata, f, indent=2)
         logger.info(f"Saved metadata for {ticker} ({form_type}): {chunk_count} chunks")
 
-    def _load_metadata(self, ticker: str, form_type: str = "10-K") -> Optional[Dict[str, Any]]:
+    def _load_metadata(self, ticker: str, form_type: str = "10-K") -> dict[str, Any] | None:
         metadata_path = self._get_metadata_path(ticker, form_type)
         if metadata_path.exists():
             try:
-                with open(metadata_path, "r") as f:
+                with open(metadata_path) as f:
                     return json.load(f)
             except Exception as e:
                 logger.warning(f"Could not load metadata for {ticker} ({form_type}): {e}")
@@ -202,7 +202,7 @@ class FAISSVectorManager:
         logger.info(f"FAISS store is current for {ticker} ({form_type}) - skipping text download")
         return False
 
-    def load_store(self, ticker: str, form_type: str = "10-K") -> Optional[FAISS]:
+    def load_store(self, ticker: str, form_type: str = "10-K") -> FAISS | None:
         """
         Load FAISS store from in-memory cache or disk.
         In-memory cache prevents re-reading disk on every Q&A call within the same session.
@@ -230,7 +230,7 @@ class FAISSVectorManager:
             logger.error(f"Failed to load store for {ticker} ({form_type}): {e}")
             return None
 
-    def create_vector_store(self, content: str, ticker: str, accession_number: str, form_type: str = "10-K") -> Optional[FAISS]:
+    def create_vector_store(self, content: str, ticker: str, accession_number: str, form_type: str = "10-K") -> FAISS | None:
         """
         Create or load FAISS vector store from SEC filing content.
 
@@ -343,7 +343,7 @@ class FAISSVectorManager:
             },
         )
 
-    def list_stores(self) -> List[str]:
+    def list_stores(self) -> list[str]:
         """Returns list of 'TICKER:form_type' strings for all existing stores."""
         results = []
         for path in self.base_dir.glob("*/*_faiss"):
@@ -354,7 +354,7 @@ class FAISSVectorManager:
                 results.append(name.replace("_10Q_faiss", "") + ":10-Q")
         return sorted(results)
 
-    def get_store_info(self, ticker: str, form_type: str = "10-K") -> Dict[str, Any]:
+    def get_store_info(self, ticker: str, form_type: str = "10-K") -> dict[str, Any]:
         ticker = ticker.upper()
         store_path = self._get_store_path(ticker, form_type)
         metadata = self._load_metadata(ticker, form_type)

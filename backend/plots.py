@@ -5,22 +5,22 @@ Contains 3 plot functions (revenue/income, balance sheet, cash flow)
 and a helper to save matplotlib figures to base64 strings.
 """
 
-import logging
 import base64
+import logging
 import traceback
 from io import BytesIO
-from typing import Optional
 
-import pandas as pd
-import numpy as np
 import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-plt.style.use('dark_background')
-import matplotlib.ticker as mtick
+import numpy as np
+import pandas as pd
 
-from edgar import Company
-from edgar.xbrl import XBRLS
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt  # noqa: E402
+
+plt.style.use('dark_background')
+import matplotlib.ticker as mtick  # noqa: E402
+from edgar import Company  # noqa: E402
+from edgar.xbrl import XBRLS  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def _save_plot_to_base64(fig, ticker: str, chart_type: str) -> str:
         raise
 
 
-def plot_revenue(ticker: str, c, xbrs) -> Optional[str]:
+def plot_revenue(ticker: str, c, xbrs) -> str | None:
     """Revenue, Gross Profit, and Net Income bar chart with margin overlays. Returns base64 PNG or None."""
     try:
         income_statement = xbrs.statements.income_statement()
@@ -155,7 +155,7 @@ def plot_revenue(ticker: str, c, xbrs) -> Optional[str]:
         return None
 
 
-def plot_balance_sheet(ticker: str, c, xbrs) -> Optional[str]:
+def plot_balance_sheet(ticker: str, c, xbrs) -> str | None:
     """Assets, Liabilities, and Stockholders Equity bar chart with D/E ratio overlay. Returns base64 PNG or None."""
     try:
         balance_sheet = xbrs.statements.balance_sheet()
@@ -229,7 +229,7 @@ def plot_balance_sheet(ticker: str, c, xbrs) -> Optional[str]:
         return None
 
 
-def plot_cash_flow(ticker: str, c, xbrs) -> Optional[str]:
+def plot_cash_flow(ticker: str, c, xbrs) -> str | None:
     """Operating, Investing, Financing, and Free Cash Flow bar chart. Returns base64 PNG or None."""
     try:
         cash_flow = xbrs.statements.cashflow_statement()

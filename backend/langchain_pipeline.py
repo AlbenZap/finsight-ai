@@ -5,8 +5,8 @@ Dual-provider setup: Ollama (self-hosted Llama 3.1 8B) or NVIDIA NIM (cloud API)
 Switch providers by setting LLM_PROVIDER env var.
 """
 
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 

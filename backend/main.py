@@ -20,9 +20,9 @@ import random
 import re
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from io import BytesIO
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 from uuid import uuid4
 
 import requests
@@ -34,8 +34,8 @@ from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel
 
-from faiss_manager import faiss_manager
 import hf_store
+from faiss_manager import faiss_manager
 from langchain_pipeline import SYSTEM_PROMPT, get_llm, get_provider_name
 from plots import get_company_filings_data, plot_balance_sheet, plot_cash_flow, plot_revenue
 
@@ -50,8 +50,8 @@ class JobStatusResponse(BaseModel):
     job_id: str
     status: Literal["processing", "complete", "error"]
     progress: str
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
 
 
 class CompanySearchResult(BaseModel):
@@ -62,7 +62,7 @@ class CompanySearchResult(BaseModel):
 
 class AgentResponse(BaseModel):
     answer: str
-    cited_sections: List[str]
+    cited_sections: list[str]
     source: Literal["document", "realtime", "hybrid"]
 
 
@@ -70,14 +70,14 @@ class AgentResponse(BaseModel):
 # Global state
 # ---------------------------------------------------------------------------
 
-jobs: Dict[str, Dict[str, Any]] = {}
-analysis_cache: Dict[str, Dict[str, Any]] = {}
+jobs: dict[str, dict[str, Any]] = {}
+analysis_cache: dict[str, dict[str, Any]] = {}
 active_jobs: set = set()
-ticker_locks: Dict[str, asyncio.Lock] = {}
+ticker_locks: dict[str, asyncio.Lock] = {}
 
 
 # Per-session conversation history: session_id -> list of (role, content) tuples
-session_history: Dict[str, List[Dict[str, str]]] = {}
+session_history: dict[str, list[dict[str, str]]] = {}
 SESSION_CAP = 50
 
 
@@ -438,7 +438,7 @@ def validate_llm_response(response: str, context: str = "summary") -> str:
     return response.strip()
 
 
-async def generate_section(llm, messages: List, context: str = "summary") -> str:
+async def generate_section(llm, messages: list, context: str = "summary") -> str:
     """Generate LLM response with up to 3 retries, exponential backoff + jitter."""
     for attempt in range(3):
         try:
@@ -895,12 +895,12 @@ app.add_middleware(
 # Company search helpers
 # ---------------------------------------------------------------------------
 
-_company_db: List[Dict] = []
+_company_db: list[dict] = []
 _company_db_fetched_at: float = 0.0
 _COMPANY_DB_TTL = 86400  # refresh once per day
 
 
-def fetch_company_database() -> List[Dict]:
+def fetch_company_database() -> list[dict]:
     """Fetch SEC company list with 24-hour in-memory cache to avoid hammering SEC on every search."""
     global _company_db, _company_db_fetched_at
     if _company_db and (time.time() - _company_db_fetched_at) < _COMPANY_DB_TTL:
@@ -929,7 +929,7 @@ def fetch_company_database() -> List[Dict]:
         return _company_db  # return stale cache on failure rather than empty list
 
 
-def rank_search_results(companies: List[Dict], query: str) -> List[Dict]:
+def rank_search_results(companies: list[dict], query: str) -> list[dict]:
     def score(c):
         t, n, q = c["ticker"].upper(), c["title"].upper(), query.upper()
         if t == q:
@@ -1057,7 +1057,7 @@ async def ask(
     ticker = ticker.upper()
 
     async def token_stream():
-        cited_sections: List[str] = []
+        cited_sections: list[str] = []
         source = "document"
 
         try:
@@ -1284,7 +1284,7 @@ def _pdf_render_content(pdf_obj, text: str) -> None:
 
 
 @app.post("/export_pdf/")
-async def export_pdf(payload: Dict[str, Any] = Body(...)):
+async def export_pdf(payload: dict[str, Any] = Body(...)):
     """
     Generate and download a PDF report from the result payload sent by the frontend.
     No server-side cache dependency - data comes directly from the request body.
@@ -1440,7 +1440,7 @@ async def export_pdf(payload: Dict[str, Any] = Body(...)):
     pdf.ln(2)
     pdf.set_font("Helvetica", "I", 7)
     pdf.set_text_color(160, 160, 160)
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     pdf.cell(
         0, 5,
         f"FinSight AI  |  Generated {ts}  |  For informational purposes only. Not financial advice.",
@@ -1459,7 +1459,7 @@ async def export_pdf(payload: Dict[str, Any] = Body(...)):
 
 
 @app.post("/export_pdf/compare/")
-async def export_pdf_compare(payload: Dict[str, Any] = Body(...)):
+async def export_pdf_compare(payload: dict[str, Any] = Body(...)):
     """
     Generate a PDF for a side-by-side company comparison.
     Accepts the comparisonData object from the frontend directly.
@@ -1566,7 +1566,7 @@ async def export_pdf_compare(payload: Dict[str, Any] = Body(...)):
     pdf.ln(2)
     pdf.set_font("Helvetica", "I", 7)
     pdf.set_text_color(160, 160, 160)
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     pdf.cell(0, 5, f"FinSight AI  |  Generated {ts}  |  For informational purposes only. Not financial advice.", align="C")
 
     pdf_bytes = bytes(pdf.output())
@@ -1727,7 +1727,7 @@ def get_vector_stores():
 @app.get("/cache/")
 def get_cache():
     """List all tickers currently in the in-memory analysis cache."""
-    grouped: Dict[str, list] = {}
+    grouped: dict[str, list] = {}
     for key in analysis_cache:
         if ":" not in key:
             continue  # skip bare-ticker aliases
