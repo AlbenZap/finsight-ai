@@ -1,0 +1,42 @@
+# Docker Compose for FinSight AI - local development only.
+# Default (NVIDIA NIM): docker compose up
+# With Ollama (self-hosted LLM): docker compose --profile ollama up
+# First-time Ollama setup: make ollama-pull
+services:
+
+  backend:
+    build: .   # uses root Dockerfile (same image as HF Spaces, PORT overridden below)
+    container_name: finsight-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app   # bind mount - faiss_stores/ lives here, visible on host
+    command: sh -c "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --reload"
+    env_file: .env
+    environment:
+      - PORT=8000
+      - PYTHONDONTWRITEBYTECODE=1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  ollama:
+    profiles: ["ollama"]   # opt-in: only starts with --profile ollama
+    image: ollama/ollama:latest
+    container_name: finsight-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s   # model pull takes time on first boot
+
+volumes:
+  ollama_data:
