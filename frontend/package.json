@@ -9,7 +9,7 @@
     "react-dom": "^18.2.0",
     "react-markdown": "^6.0.3",
     "tailwindcss": "^3.3.0",
-    "uuid": "^9.0.0"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.0",
